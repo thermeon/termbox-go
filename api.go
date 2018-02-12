@@ -488,7 +488,9 @@ func SetOutputMode(mode OutputMode) OutputMode {
 // forces a complete resync between the termbox and a terminal, it may not be
 // visually pretty though.
 func Sync() error {
-	front_buffer.clear()
+	// reset the front buffer completely so none of the cells match the back
+	// buffer's and hence forcing a complete re-draw of the terminal's screen.
+	front_buffer.reset()
 	err := send_clear()
 	if err != nil {
 		return err
