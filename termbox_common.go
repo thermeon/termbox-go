@@ -52,6 +52,13 @@ func (this *cellbuf) clear() {
 	}
 }
 
+// reset completely zeroes all cells in the buffer
+func (this *cellbuf) reset() {
+	for i := range this.cells {
+		this.cells[i] = Cell{}
+	}
+}
+
 const cursor_hidden = -1
 
 func is_cursor_hidden(x, y int) bool {

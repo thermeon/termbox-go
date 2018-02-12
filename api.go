@@ -54,26 +54,9 @@ func Init() error {
 		return err
 	}
 
-	tios := orig_tios
-	tios.Iflag &^= syscall_IGNBRK | syscall_BRKINT | syscall_PARMRK |
-		syscall_ISTRIP | syscall_INLCR | syscall_IGNCR |
-		syscall_ICRNL | syscall_IXON
-	tios.Lflag &^= syscall_ECHO | syscall_ECHONL | syscall_ICANON |
-		syscall_ISIG | syscall_IEXTEN
-	tios.Cflag &^= syscall_CSIZE | syscall_PARENB
-	tios.Cflag |= syscall_CS8
-	tios.Cc[syscall_VMIN] = 1
-	tios.Cc[syscall_VTIME] = 0
-
-	err = tcsetattr(out.Fd(), &tios)
-	if err != nil {
+	if err := ResetTerm(); err != nil {
 		return err
 	}
-
-	out.WriteString(funcs[t_enter_ca])
-	out.WriteString(funcs[t_enter_keypad])
-	out.WriteString(funcs[t_hide_cursor])
-	out.WriteString(funcs[t_clear_screen])
 
 	termw, termh = get_term_size(out.Fd())
 	back_buffer.init(termw, termh)
@@ -106,6 +89,32 @@ func Init() error {
 	}()
 
 	IsInit = true
+	return nil
+}
+
+// Resets the terminal to the initial state
+func ResetTerm() error {
+	tios := orig_tios
+	tios.Iflag &^= syscall_IGNBRK | syscall_BRKINT | syscall_PARMRK |
+		syscall_ISTRIP | syscall_INLCR | syscall_IGNCR |
+		syscall_ICRNL | syscall_IXON
+	tios.Lflag &^= syscall_ECHO | syscall_ECHONL | syscall_ICANON |
+		syscall_ISIG | syscall_IEXTEN
+	tios.Cflag &^= syscall_CSIZE | syscall_PARENB
+	tios.Cflag |= syscall_CS8
+	tios.Cc[syscall_VMIN] = 1
+	tios.Cc[syscall_VTIME] = 0
+
+	err := tcsetattr(out.Fd(), &tios)
+	if err != nil {
+		return err
+	}
+
+	out.WriteString(funcs[t_enter_ca])
+	out.WriteString(funcs[t_enter_keypad])
+	out.WriteString(funcs[t_hide_cursor])
+	out.WriteString(funcs[t_clear_screen])
+
 	return nil
 }
 
@@ -479,7 +488,9 @@ func SetOutputMode(mode OutputMode) OutputMode {
 // forces a complete resync between the termbox and a terminal, it may not be
 // visually pretty though.
 func Sync() error {
-	front_buffer.clear()
+	// reset the front buffer completely so none of the cells match the back
+	// buffer's and hence forcing a complete re-draw of the terminal's screen.
+	front_buffer.reset()
 	err := send_clear()
 	if err != nil {
 		return err
