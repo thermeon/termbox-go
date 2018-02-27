@@ -485,5 +485,10 @@ func Sync() error {
 		return err
 	}
 
+	// invalidate foregound and background colours so the Flush() operation will
+	// ensure that colour attributes are sent to the terminal again.
+	lastfg = attr_invalid
+	lastbg = attr_invalid
+
 	return Flush()
 }
