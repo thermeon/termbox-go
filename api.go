@@ -2,13 +2,17 @@
 
 package termbox
 
-import "github.com/mattn/go-runewidth"
-import "fmt"
-import "os"
-import "os/signal"
-import "syscall"
-import "runtime"
-import "time"
+import (
+	"fmt"
+	"io"
+	"os"
+	"os/signal"
+	"runtime"
+	"syscall"
+	"time"
+
+	"github.com/mattn/go-runewidth"
+)
 
 // public API
 
@@ -65,6 +69,9 @@ func Init() error {
 	front_buffer.clear()
 
 	go func() {
+		var inpgrab_rc *inpgrab_read_closer
+		var inpgrab_ch chan byte
+
 		buf := make([]byte, 128)
 		for {
 			select {
@@ -74,12 +81,51 @@ func Init() error {
 					if err == syscall.EAGAIN || err == syscall.EWOULDBLOCK {
 						break
 					}
-					select {
-					case input_comm <- input_event{buf[:n], err}:
-						ie := <-input_comm
-						buf = ie.data[:128]
-					case <-quit:
-						return
+
+					if inpgrab_ch != nil {
+						// If the input has been grabbed, send characters to the
+						// inpgrab_ch instead of to the event handlers
+						select {
+						case inpgrab <- inpgrab_ev{cmd: inpgrab_cmd_send_data, data: buf[:n]}:
+						case <-quit:
+							return
+						}
+					} else {
+						select {
+						case input_comm <- input_event{buf[:n], err}:
+							ie := <-input_comm
+							buf = ie.data[:128]
+						case <-quit:
+							return
+						}
+					}
+				}
+			case ev := <-inpgrab:
+				// The inpgrab channel can be used to perform input stream
+				// grabbing related operations.
+				switch ev.cmd {
+				case inpgrab_cmd_grab:
+					res := inpgrab_result{}
+					if inpgrab_rc != nil {
+						res.err = fmt.Errorf("Input already grabbed")
+					} else {
+						inpgrab_ch = make(chan byte, 1)
+
+						res.rc = &inpgrab_read_closer{
+							in:       inpgrab_ch,
+							on_close: func() { inpgrab <- inpgrab_ev{cmd: inpgrab_cmd_release} },
+						}
+					}
+					inpgrab_res <- res
+
+				case inpgrab_cmd_release:
+					close(inpgrab_ch)
+					inpgrab_ch = nil
+					inpgrab_rc = nil
+
+				case inpgrab_cmd_send_data:
+					for _, b := range ev.data {
+						inpgrab_ch <- b
 					}
 				}
 			case <-quit:
@@ -123,6 +169,19 @@ func ResetTerm() error {
 // function has successfully been interrupted.
 func Interrupt() {
 	interrupt_comm <- struct{}{}
+}
+
+// GrabTtyInput returns an io.ReadCloser from which the terminal input can be
+// read. While the stream is open, termbox-go stops emitting events for the
+// input. Once the stream is closed, termbox-go returns to normal input events
+// processing.
+//
+// Use this if you want to launch another program from within an application
+// that uses termbox.
+func GrabTtyInput() (io.ReadCloser, error) {
+	inpgrab <- inpgrab_ev{cmd: inpgrab_cmd_grab}
+	res := <-inpgrab_res
+	return res.rc, res.err
 }
 
 // Finalizes termbox library, should be called after successful initialization
