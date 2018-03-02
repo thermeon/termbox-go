@@ -2,14 +2,17 @@
 
 package termbox
 
-import "unicode/utf8"
-import "bytes"
-import "syscall"
-import "unsafe"
-import "strings"
-import "strconv"
-import "os"
-import "io"
+import (
+	"bytes"
+	"fmt"
+	"io"
+	"os"
+	"strconv"
+	"strings"
+	"syscall"
+	"unicode/utf8"
+	"unsafe"
+)
 
 // private API
 
@@ -49,6 +52,81 @@ const (
 	esc_wait
 )
 
+// inpgrab_cmd values are commands used for input stream grabbing
+type inpgrab_cmd int
+
+const (
+	inpgrab_cmd_grab = iota
+	inpgrab_cmd_release
+	inpgrab_cmd_send_data
+)
+
+// inpgrab_ev is an input grab event
+type inpgrab_ev struct {
+	cmd inpgrab_cmd
+	// The data from the input stream if cmd == inpgrab_cmd_send_data
+	data []byte
+}
+
+// inpgrab_result is the result of the inpgrab_cmd_grab command
+type inpgrab_result struct {
+	rc  io.ReadCloser
+	err error
+}
+
+// inpgrab_read_closer is an io.ReadCloser meant to expose the grabbed
+// input stream to applications
+type inpgrab_read_closer struct {
+	// Input stream bytes
+	in <-chan byte
+	// Function to call on Close(). This is called only once even if Close()
+	// gets called multiple times.
+	on_close func()
+
+	closed bool
+}
+
+var _ io.ReadCloser = &inpgrab_read_closer{}
+
+// Read reads from the grabbed input stream. It doesn't wait for the input
+// to fill up the buffer, so it'll generally return n < len(p) and no error.
+func (rc *inpgrab_read_closer) Read(p []byte) (n int, err error) {
+	for {
+		select {
+		case ch, ok := <-rc.in:
+			if !ok {
+				return n, io.EOF
+			}
+			p[n] = ch
+			n++
+		default:
+			if n != 0 {
+				return n, nil
+			}
+			// There's no data to send, so block till we have something
+			p[n] = <-rc.in
+			n++
+		}
+	}
+}
+
+// Close closes the grabbed input stream and hands control back to termbox-go's
+// event processing.
+func (rc *inpgrab_read_closer) Close() error {
+	if rc.closed {
+		return fmt.Errorf("Reader already closed")
+	}
+	rc.closed = true
+	go func() {
+		// Drain the input stream
+		for range rc.in {
+		}
+	}()
+	rc.on_close()
+
+	return nil
+}
+
 var (
 	// term specific sequences
 	keys  []string
@@ -76,10 +154,15 @@ var (
 	outbuf         bytes.Buffer
 	sigwinch       = make(chan os.Signal, 1)
 	sigio          = make(chan os.Signal, 1)
+	inpgrab        = make(chan inpgrab_ev, 1)
+	inpgrab_res    = make(chan inpgrab_result, 1)
 	quit           = make(chan int)
 	input_comm     = make(chan input_event)
 	interrupt_comm = make(chan struct{})
 	intbuf         = make([]byte, 0, 16)
+
+	// sync/atomic is used to access this variable
+	input_grabbed int32
 
 	// grayscale indexes
 	grayscale = []Attribute{
