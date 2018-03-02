@@ -84,7 +84,9 @@ func Init() error {
 
 					if inpgrab_ch != nil {
 						// If the input has been grabbed, send characters to the
-						// inpgrab_ch instead of to the event handlers
+						// inpgrab_ch channel instead of to the event handlers.
+						// This is done indirectly by sending a command to
+						// inpgrab, which is processed in another 'case' block.
 						select {
 						case inpgrab <- inpgrab_ev{cmd: inpgrab_cmd_send_data, data: buf[:n]}:
 						case <-quit:
@@ -101,10 +103,14 @@ func Init() error {
 					}
 				}
 			case ev := <-inpgrab:
-				// The inpgrab channel can be used to perform input stream
+				// The inpgrab channel is used to perform input stream
 				// grabbing related operations.
 				switch ev.cmd {
 				case inpgrab_cmd_grab:
+					// Application wants to grab the input stream. From now till
+					// the grab is released, don't generate events for input data
+					// but instead allow the application read it from the io.ReadCloser
+					// returned by GrabTtyInput()
 					res := inpgrab_result{}
 					if inpgrab_rc != nil {
 						res.err = fmt.Errorf("Input already grabbed")
@@ -119,11 +125,13 @@ func Init() error {
 					inpgrab_res <- res
 
 				case inpgrab_cmd_release:
+					// Release the grab and hand back control to termbox
 					close(inpgrab_ch)
 					inpgrab_ch = nil
 					inpgrab_rc = nil
 
 				case inpgrab_cmd_send_data:
+					// Send data to the io.ReadCloser
 					for _, b := range ev.data {
 						inpgrab_ch <- b
 					}
@@ -172,12 +180,12 @@ func Interrupt() {
 }
 
 // GrabTtyInput returns an io.ReadCloser from which the terminal input can be
-// read. While the stream is open, termbox-go stops emitting events for the
-// input. Once the stream is closed, termbox-go returns to normal input events
+// read. While the stream is open, termbox stops emitting events for the
+// input. Once the stream is closed, termbox returns to normal input events
 // processing.
 //
-// Use this if you want to launch another program from within an application
-// that uses termbox.
+// Use this instead of os.Stdin to read data from standard input to use termbox's
+// async IO for reading.
 func GrabTtyInput() (io.ReadCloser, error) {
 	inpgrab <- inpgrab_ev{cmd: inpgrab_cmd_grab}
 	res := <-inpgrab_res

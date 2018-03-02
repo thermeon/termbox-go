@@ -2,6 +2,10 @@
 All notable changes to this project will be documented in this file.
 This project adheres to [Semantic Versioning](http://semver.org/).
 
+## [UNRELEASED] - 0000-00-00
+### Added
+- GrabTtyInput() to allow applications to read from the TTY without termbox processing events
+
 ## [0.2.0] - 2018-02-27
 ### Changed
 - Reset the last used foreground and background colours in Sync() so they are re-sent to the terminal
