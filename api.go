@@ -272,6 +272,8 @@ func Flush() error {
 	}
 	if !is_cursor_hidden(cursor_x, cursor_y) {
 		write_cursor(cursor_x, cursor_y)
+	}else {
+		outbuf.WriteString(funcs[t_hide_cursor])
 	}
 	return flush()
 }
