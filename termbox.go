@@ -154,7 +154,7 @@ var (
 	outbuf         bytes.Buffer
 	sigwinch       = make(chan os.Signal, 1)
 	sigio          = make(chan os.Signal, 1)
-	inpgrab        = make(chan inpgrab_ev, 1)
+	inpgrab        = make(chan inpgrab_ev, 1000)
 	inpgrab_res    = make(chan inpgrab_result, 1)
 	quit           = make(chan int)
 	input_comm     = make(chan input_event)

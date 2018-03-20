@@ -87,8 +87,10 @@ func Init() error {
 						// inpgrab_ch channel instead of to the event handlers.
 						// This is done indirectly by sending a command to
 						// inpgrab, which is processed in another 'case' block.
+						outbuf := make([]byte, n)
+						copy(outbuf, buf[:n])
 						select {
-						case inpgrab <- inpgrab_ev{cmd: inpgrab_cmd_send_data, data: buf[:n]}:
+						case inpgrab <- inpgrab_ev{cmd: inpgrab_cmd_send_data, data: outbuf}:
 						case <-quit:
 							return
 						}
