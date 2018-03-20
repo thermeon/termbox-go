@@ -2,6 +2,12 @@
 All notable changes to this project will be documented in this file.
 This project adheres to [Semantic Versioning](http://semver.org/).
 
+## [Unreleased] - 0000-00-00
+
+## [0.5.0] - 2018-03-20
+### Fixed
+- Fix blocking of input when the input has been grabbed and data comes in too fast
+
 ## [0.4.0] - 2018-03-09
 ### Fixed
 - Fixed cursor showing when it should be hidden
