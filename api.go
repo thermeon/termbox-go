@@ -85,14 +85,12 @@ func Init() error {
 					if inpgrab_ch != nil {
 						// If the input has been grabbed, send characters to the
 						// inpgrab_ch channel instead of to the event handlers.
-						// This is done indirectly by sending a command to
-						// inpgrab, which is processed in another 'case' block.
-						outbuf := make([]byte, n)
-						copy(outbuf, buf[:n])
-						select {
-						case inpgrab <- inpgrab_ev{cmd: inpgrab_cmd_send_data, data: outbuf}:
-						case <-quit:
-							return
+						for _, b := range buf[:n] {
+							select {
+							case inpgrab_ch <- b:
+							case <-quit:
+								return
+							}
 						}
 					} else {
 						select {
@@ -131,12 +129,6 @@ func Init() error {
 					close(inpgrab_ch)
 					inpgrab_ch = nil
 					inpgrab_rc = nil
-
-				case inpgrab_cmd_send_data:
-					// Send data to the io.ReadCloser
-					for _, b := range ev.data {
-						inpgrab_ch <- b
-					}
 				}
 			case <-quit:
 				return
