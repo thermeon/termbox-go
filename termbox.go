@@ -58,7 +58,6 @@ type inpgrab_cmd int
 const (
 	inpgrab_cmd_grab = iota
 	inpgrab_cmd_release
-	inpgrab_cmd_send_data
 )
 
 // inpgrab_ev is an input grab event
