@@ -4,6 +4,14 @@ This project adheres to [Semantic Versioning](http://semver.org/).
 
 ## [Unreleased] - 0000-00-00
 
+## [0.7.0] - 2018-03-27
+### Fixed
+- Fix deadlock in goroutine that processed input when the input was grabbed
+
+## [0.6.0] - 2018-03-26
+### Fixed
+- Further input block fix
+
 ## [0.5.0] - 2018-03-20
 ### Fixed
 - Fix blocking of input when the input has been grabbed and data comes in too fast
