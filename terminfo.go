@@ -128,7 +128,7 @@ func setup_term_builtin() error {
 		}
 	}
 
-	return errors.New("termbox: unsupported terminal")
+	return errors.New(fmt.Sprintf(`termbox: unsupported terminal "%s"`, name))
 }
 
 func setup_term() (err error) {
