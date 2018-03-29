@@ -3,6 +3,9 @@ All notable changes to this project will be documented in this file.
 This project adheres to [Semantic Versioning](http://semver.org/).
 
 ## [Unreleased] - 0000-00-00
+## [0.8.0] - 2018-03-29
+### Added
+- Add context to unsupported terminal error
 
 ## [0.7.0] - 2018-03-27
 ### Fixed
